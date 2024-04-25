@@ -1,0 +1,38 @@
+# IMAP settings
+IMAP_SERVER: <exchange.server>
+IMAP_USERNAME: <AD>
+IMAP_PASSWORD: <Password>
+
+# Jira settings
+JIRA_URL: <https://tool-dev.home/jira>
+JIRA_USERNAME: <AD>
+JIRA_PASSWORD: <Password>
+JIRA_PROJECT_KEY: I4
+
+# Mailbox paths
+INBOX_PATH: inbox/test/ingest
+COMPLETED_PATH: inbox/test/completed
+
+# Rmail content to Jira
+TEXT2JIRA:
+  SUMMARY:
+    FIELD: summary
+  Issue_Type:
+    FIELD: issuetype
+  Description:
+    FIELD: descriotion
+  Components(External_Events/Regular_task):
+    FIELD: component
+    DEFAULT: Regular_Task
+  Labels(PMO/VMO/Events):
+    FIELD: labels
+    DEFAULT: PMO
+  Start_Date:
+    FIELD: "Start date"
+  Due_Date:
+    FIELD: duedate
+  Priority(Low/Medium/High/Urgent):
+    FIELD: priority
+    DEFAULT: Low
+  Release_Notes:
+    FIELD: "Release Notes"
