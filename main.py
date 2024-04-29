@@ -2,7 +2,7 @@ import imaplib
 from email.parser import BytesParser
 from email.message import Message
 from email.header import decode_header
-from jira import JIRA, Issue as JiraIssue
+from jira import JIRA
 import requests
 import html2text
 import yaml
@@ -26,33 +26,56 @@ def get_cconfig() -> dict:
         return {}
 
 
-def create_jira_ticket(
-    jira_key: str, email_suject: str, email_body: str, text2jira: dict
-) -> JiraIssue:
-    issue_dict = {
-        "project": {"key": jira_key},  # Replace with the actual project key
-        "summary": email_suject,
-        "issuetype": {"name": "Task"},
-    }
+def parse_plain_table(body: str) -> dict:
+    """Parse plain text table to dictionary. The table content is between `---|---` and 'end  |'.
+    plain text table format:
+        ```
+        Some text here
 
-    for line in email_body.split("\n"):
-        # Skip split line and empty line
-        if ("---" in line) or ("|" not in line):
-            continue
-        mail_key, mail_value = line.split("|")
-        mail_key = mail_key.strip()
-        mail_value = mail_value.strip()
-        if mail_key not in text2jira.keys():
+        field |  content
+        ---|---
+        A  |  B
+        C  |  D
+        multi-line
+        end  |
+
+        more text here
+        ```
+
+    Args:
+        body: email content
+
+    Returns:
+        Dictionary of field and content.
+    """
+    resultd = {}
+    _key, _value = "", ""
+    _start = False
+    lines = body.strip().splitlines()
+    for i in range(len(lines)):
+        # start of the table
+        if "---|---" in lines[i]:
+            _start = True
             continue
 
-        if mail_value:
-            issue_dict[text2jira[mail_key]["FIELD"]] = mail_value
+        # end of the table
+        if "end" in lines[i] and "|" in lines[i]:
+            _start = False
+            break
+
+        if not _start:
+            continue
+
+        parsed = lines[i].strip().split("|")
+        if len(parsed) != 2:
+            resultd[_key] += "\n " + parsed[0].strip()
         else:
-            issue_dict[text2jira[mail_key]["FIELD"]] = text2jira[mail_key].get(
-                "DEFAULT", ""
-            )
+            _key, _value = parsed
+            _key = _key.strip()
+            _value = _value.strip()
+            resultd[_key] = _value
 
-    return jira.create_issue(fields=issue_dict)
+    return resultd
 
 
 # Function to convert HTML to plaintext
@@ -128,7 +151,8 @@ if __name__ == "__main__":
     # Connect to Jira using the API URL
     print("Connecting to Jira...")
     jira = JIRA(
-        options, basic_auth=(cfg.get("JIRA_USERNAME", ""), cfg.get("JIRA_PASSWORD", ""))
+        options=options,
+        basic_auth=(cfg.get("JIRA_USERNAME", ""), cfg.get("JIRA_PASSWORD", "")),
     )
     print("Connected to Jira.")
     # Search for all emails in the mailbox
@@ -153,12 +177,27 @@ if __name__ == "__main__":
 
                     # Create Jira ticket
                     print("Processing email...")
-                    jira_ticket = create_jira_ticket(
-                        cfg.get("JIRA_PROJECT_KEY", ""),
-                        subject,
-                        body,
-                        cfg.get("TEXT2JIRA", {}),
-                    )
+                    issue_dict = {
+                        "project": {
+                            "key": cfg.get("JIRA_PROJECT_KEY")
+                        },  # Replace with the actual project key
+                        "summary": subject,
+                        "issuetype": {"name": "Task"},
+                    }
+                    text2jira = cfg.get("TEXT2JIRA", {})
+                    emaild = parse_plain_table(body)
+                    for _field, _content in emaild.items():
+                        if _field not in text2jira.keys():
+                            continue
+
+                        if _content:
+                            issue_dict[text2jira[_field]["FIELD"]] = _content
+                        else:
+                            issue_dict[text2jira[_field]["FIELD"]] = text2jira[
+                                _field
+                            ].get("DEFAULT", "")
+
+                    jira_ticket = jira.create_issue(fields=issue_dict)
                     print(f"Jira ticket created: {jira_ticket.key}")
 
                     # Move the email to the completed mailbox

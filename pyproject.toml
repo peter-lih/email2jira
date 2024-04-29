@@ -2,7 +2,7 @@
 name = "email2jira"
 version = "0.1.0"
 description = ""
-authors = ["Peter <peter004@liyao.co>"]
+authors = ["Peter <peter@liyao.co>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
@@ -19,3 +19,9 @@ pynvim = "^0.5.0"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pyright]
+exclude = [".venv"]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.10"
