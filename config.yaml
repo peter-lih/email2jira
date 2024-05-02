@@ -15,24 +15,30 @@ COMPLETED_PATH: inbox/test/completed
 
 # Rmail content to Jira
 TEXT2JIRA:
-  SUMMARY:
-    FIELD: summary
   Issue_Type:
     FIELD: issuetype
   Description:
-    FIELD: descriotion
-  Components(External_Events/Regular_task):
+    FIELD: description
+  Components(External_Events_Webinars/Regular_Task/Work_Progress):
     FIELD: component
     DEFAULT: Regular_Task
-  Labels(PMO/VMO/Events):
+  Labels(PMO/VMO/RMS/KITEC_Relocation/Planning/Security_Awareness/IT_Mgmt/T&D/Cybersecurity_Awareness/Events):
     FIELD: labels
     DEFAULT: PMO
-  Start_Date:
-    FIELD: "Start date"
-  Due_Date:
+  Start_Date(DD/MMM/YYYY):
+    FIELD: customfield_10603
+  Due_Date(DD/MMM/YYYY):
     FIELD: duedate
+  Actutal_End_Date(DD/MMM/YYYY):
+    FIELD: customfield_10418
   Priority(Low/Medium/High/Urgent):
     FIELD: priority
     DEFAULT: Low
   Release_Notes:
-    FIELD: "Release Notes"
+    FIELD: customfield_11824
+  Assignee(Lck599):
+    FIELD: assignee
+    DEFAULT: Lck599
+
+ASSIGNEE2ID:
+  Lck599: JIRAUSER43166

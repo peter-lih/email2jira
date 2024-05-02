@@ -7,6 +7,7 @@ import requests
 import html2text
 import yaml
 import os
+from datetime import datetime
 
 requests.packages.urllib3.disable_warnings()
 
@@ -24,6 +25,60 @@ def get_cconfig() -> dict:
     else:
         print(f"Config file not found: {path}")
         return {}
+
+
+def dict2jira_issue(cfg: dict, emaild: dict, email_subject: str) -> dict:
+    issue_dict = {
+        "project": {"key": cfg.get("JIRA_PROJECT_KEY")},
+        "summary": email_subject,
+    }
+    for _field, _content in emaild.items():
+        if _field not in text2jira.keys():
+            continue
+
+        issue_field = text2jira[_field]["FIELD"]
+        # `labels` field is a list
+        if issue_field == "labels":
+            if _content:
+                issue_dict[issue_field] = [_content]
+            else:
+                issue_dict[issue_field] = [text2jira[_field].get("DEFAULT", "")]
+        elif issue_field in ("issuetype", "priority"):
+            if _content:
+                issue_dict[issue_field] = {"name": _content}
+            else:
+                issue_dict[issue_field] = {"name": text2jira[_field].get("DEFAULT", "")}
+        # date in dd/mmm/yyyy
+        elif issue_field in (
+            "duedate",
+            "customfield_10603",
+            "customfield_10418",
+        ):
+            if _content:
+                issue_dict[issue_field] = (
+                    datetime.isoformat(datetime.strptime(_content, "%d/%b/%Y"))[:-3]
+                    + "+0000"
+                )
+            else:
+                issue_dict[issue_field] = (
+                    datetime.isoformat(datetime.now())[:-3] + "+0000"
+                )
+        elif issue_field == "assignee":
+            assignee2id = cfg.get("ASSIGNEE2ID", {})
+            if _content:
+                issue_dict[issue_field] = {"id": assignee2id.get(_content)}
+            else:
+                issue_dict[issue_field] = {
+                    "id": assignee2id.get(text2jira[_field].get("DEFAULT", ""))
+                }
+
+        else:
+            if _content:
+                issue_dict[issue_field] = _content
+            else:
+                issue_dict[issue_field] = text2jira[_field].get("DEFAULT", "")
+
+    return issue_dict
 
 
 def parse_plain_table(body: str) -> dict:
@@ -169,7 +224,7 @@ if __name__ == "__main__":
 
                     # Parse email headers
                     subject = get_subject(msg)
-                    if not cfg.get("JIRA_PROJECT_KEY") in subject:
+                    if cfg.get("JIRA_PROJECT_KEY", "") not in subject:
                         continue
 
                     # Parse email body if needed
@@ -177,36 +232,9 @@ if __name__ == "__main__":
 
                     # Create Jira ticket
                     print("Processing email...")
-                    issue_dict = {
-                        "project": {
-                            "key": cfg.get("JIRA_PROJECT_KEY")
-                        },  # Replace with the actual project key
-                        "summary": subject,
-                        "issuetype": {"name": "Task"},
-                    }
                     text2jira = cfg.get("TEXT2JIRA", {})
                     emaild = parse_plain_table(body)
-                    for _field, _content in emaild.items():
-                        if _field not in text2jira.keys():
-                            continue
-
-                        # `labels` field is a list
-                        issue_field = text2jira[_field]["FIELD"]
-                        if issue_field == "labels":
-                            if _content:
-                                issue_dict[issue_field] = [_content]
-                            else:
-                                issue_dict[issue_field] = [
-                                    text2jira[_field].get("DEFAULT", "")
-                                ]
-
-                        else:
-                            if _content:
-                                issue_dict[issue_field] = _content
-                            else:
-                                issue_dict[issue_field] = text2jira[_field].get(
-                                    "DEFAULT", ""
-                                )
+                    issue_dict = dict2jira_issue(cfg, emaild, subject)
 
                     jira_ticket = jira.create_issue(fields=issue_dict)
                     print(f"Jira ticket created: {jira_ticket.key}")
