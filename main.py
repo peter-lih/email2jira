@@ -190,12 +190,23 @@ if __name__ == "__main__":
                         if _field not in text2jira.keys():
                             continue
 
-                        if _content:
-                            issue_dict[text2jira[_field]["FIELD"]] = _content
+                        # `labels` field is a list
+                        issue_field = text2jira[_field]["FIELD"]
+                        if issue_field == "labels":
+                            if _content:
+                                issue_dict[issue_field] = [_content]
+                            else:
+                                issue_dict[issue_field] = [
+                                    text2jira[_field].get("DEFAULT", "")
+                                ]
+
                         else:
-                            issue_dict[text2jira[_field]["FIELD"]] = text2jira[
-                                _field
-                            ].get("DEFAULT", "")
+                            if _content:
+                                issue_dict[issue_field] = _content
+                            else:
+                                issue_dict[issue_field] = text2jira[_field].get(
+                                    "DEFAULT", ""
+                                )
 
                     jira_ticket = jira.create_issue(fields=issue_dict)
                     print(f"Jira ticket created: {jira_ticket.key}")
