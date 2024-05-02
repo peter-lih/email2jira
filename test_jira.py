@@ -1,6 +1,6 @@
 from jira import JIRA, Issue as JiraIssue
 
-token = "ATATT3xFfGF0AQ5fOiZGlhaC1t20Od0YsgVy9q0Qo1qxJP74XFYfw-CmH3ug7s7RlyhG1ITHlF-6PZliRsb_h-elIBgRGWsRcYlrUWZQg_m6IKbsLouyRMMm3WU5cIgCMGHmh-Ey2eqIwOHjxgwGDHZjP5xfIAYfDMycYUB4GZznoqhkTZ2_S9I=7A592102"
+token = ""
 
 if __name__ == "__main__":
     options = {
