@@ -43,11 +43,18 @@ def dict2jira_issue(cfg: dict, emaild: dict, email_subject: str) -> dict:
                 issue_dict[issue_field] = [_content]
             else:
                 issue_dict[issue_field] = [text2jira[_field].get("DEFAULT", "")]
-        elif issue_field in ("issuetype", "priority"):
+        elif issue_field in ("issuetype", "priority", "assignee", "reporter"):
             if _content:
                 issue_dict[issue_field] = {"name": _content}
             else:
                 issue_dict[issue_field] = {"name": text2jira[_field].get("DEFAULT", "")}
+        elif issue_field in ("components",):
+            if _content:
+                issue_dict[issue_field] = [{"name": _content}]
+            else:
+                issue_dict[issue_field] = [
+                    {"name": text2jira[_field].get("DEFAULT", "")}
+                ]
         # date in dd/mmm/yyyy
         elif issue_field in (
             "duedate",
@@ -63,14 +70,6 @@ def dict2jira_issue(cfg: dict, emaild: dict, email_subject: str) -> dict:
                 issue_dict[issue_field] = (
                     datetime.isoformat(datetime.now())[:-3] + "+0000"
                 )
-        elif issue_field == "assignee":
-            assignee2id = cfg.get("ASSIGNEE2ID", {})
-            if _content:
-                issue_dict[issue_field] = {"id": assignee2id.get(_content)}
-            else:
-                issue_dict[issue_field] = {
-                    "id": assignee2id.get(text2jira[_field].get("DEFAULT", ""))
-                }
 
         else:
             if _content:
