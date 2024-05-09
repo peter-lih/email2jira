@@ -1,3 +1,4 @@
+version: 2024/05/09
 # IMAP settings
 IMAP_SERVER: <exchange.server>
 IMAP_USERNAME: <AD>
@@ -12,6 +13,7 @@ JIRA_PROJECT_KEY: I4
 # Mailbox paths
 INBOX_PATH: inbox/test/ingest
 COMPLETED_PATH: inbox/test/completed
+ERROR_PATH: inbox/test/error
 
 # Rmail content to Jira
 TEXT2JIRA:
@@ -40,3 +42,38 @@ TEXT2JIRA:
     FIELD: assignee
   Reporter:
     FIELD: reporter
+    DEFAULT: Lck599
+
+LOGGING:
+  version: 1
+  disable_existing_loggers: False
+  formatters:
+    simple:
+      format: "[%(asctime)s] %(name)s - %(levelname)s - %(message)s  (line:%(lineno)s in %(funcName)s)"
+      datefmt: "%Y-%m-%d %H:%M:%S%z"
+
+  handlers:
+    console:
+      class: logging.StreamHandler
+      level: DEBUG
+      formatter: simple
+      stream: ext://sys.stdout
+
+    file_handler:
+      class: logging.handlers.RotatingFileHandler
+      level: INFO
+      formatter: simple
+      filename: ./log/info.log
+      maxBytes: 20971520 # 20MB
+      backupCount: 2
+      encoding: utf8
+
+  loggers:
+    email2jira:
+      level: DEBUG
+      handlers: [console, file_handler]
+      propagate: no
+
+  root:
+    level: DEBUG
+    handlers: [console, file_handler]

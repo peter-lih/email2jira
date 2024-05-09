@@ -8,8 +8,11 @@ import html2text
 import yaml
 import os
 from datetime import datetime
+import logging
+import logging.config
 
 requests.packages.urllib3.disable_warnings()
+logger = logging.getLogger("email2jira")
 
 
 def get_cconfig() -> dict:
@@ -23,7 +26,7 @@ def get_cconfig() -> dict:
             cfg = yaml.safe_load(f.read())
         return cfg
     else:
-        print(f"Config file not found: {path}")
+        logger.info(f"Config file not found: {path}")
         return {}
 
 
@@ -185,69 +188,82 @@ def get_body(msg: Message) -> str:
 
 if __name__ == "__main__":
     cfg = get_cconfig()
-    print("Get config")
+    logging.config.dictConfig(cfg.get("LOGGING", {}))
+    logger.info("Start processing...")
 
     options = {
         "server": cfg.get("JIRA_URL"),
         "verify": False,
     }  # Disable certificate verification
     # Connect to IMAP server
-    print("Connecting to IMAP server...")
+    logger.info("Connecting to IMAP server...")
     imap_server = imaplib.IMAP4_SSL(cfg.get("IMAP_SERVER", ""))
     imap_server.login(cfg.get("IMAP_USERNAME", ""), cfg.get("IMAP_PASSWORD", ""))
-    print("Connected to IMAP server.")
+    logger.info("Connected to IMAP server.")
 
     # Select the mailbox to monitor
-    print(f"Selecting mailbox: {cfg.get('INBOX_PATH', '')}")
+    logger.info(f"Selecting mailbox: {cfg.get('INBOX_PATH', '')}")
     imap_server.select(cfg.get("INBOX_PATH", ""))
-    print(f"Selected mailbox: {cfg.get('INBOX_PATH', '')}")
+    logger.info(f"Selected mailbox: {cfg.get('INBOX_PATH', '')}")
 
     # Connect to Jira using the API URL
-    print("Connecting to Jira...")
+    logger.info("Connecting to Jira...")
     jira = JIRA(
         options=options,
         basic_auth=(cfg.get("JIRA_USERNAME", ""), cfg.get("JIRA_PASSWORD", "")),
     )
-    print("Connected to Jira.")
+    logger.info("Connected to Jira.")
     # Search for all emails in the mailbox
-    print("Searching for emails...")
+    logger.info("Searching for emails...")
     status, messages = imap_server.search(None, "ALL")
 
     if status == "OK":
-        print(f"Found {len(messages[0].split())} email(s).")
+        logger.info(f"Found {len(messages[0].split())} email(s).")
         for num in messages[0].split():
             _, msg_data = imap_server.fetch(num, "(RFC822)")
             for response_part in msg_data:
                 if isinstance(response_part, tuple):
-                    msg = BytesParser().parsebytes(response_part[1])
+                    try:
+                        msg = BytesParser().parsebytes(response_part[1])
 
-                    # Parse email headers
-                    subject = get_subject(msg)
-                    if cfg.get("JIRA_PROJECT_KEY", "") not in subject:
-                        continue
+                        # Parse email headers
+                        subject = get_subject(msg)
+                        if cfg.get("JIRA_PROJECT_KEY", "") not in subject:
+                            continue
 
-                    # Parse email body if needed
-                    body = get_body(msg)
+                        # Parse email body if needed
+                        body = get_body(msg)
 
-                    # Create Jira ticket
-                    print("Processing email...")
-                    text2jira = cfg.get("TEXT2JIRA", {})
-                    emaild = parse_plain_table(body)
-                    issue_dict = dict2jira_issue(cfg, emaild, subject)
+                        # Create Jira ticket
+                        logger.info("Processing email...")
+                        text2jira = cfg.get("TEXT2JIRA", {})
+                        emaild = parse_plain_table(body)
+                        issue_dict = dict2jira_issue(cfg, emaild, subject)
 
-                    jira_ticket = jira.create_issue(fields=issue_dict)
-                    print(f"Jira ticket created: {jira_ticket.key}")
+                        jira_ticket = jira.create_issue(fields=issue_dict)
+                        logger.info(f"Jira ticket created: {jira_ticket.key}")
 
-                    # Move the email to the completed mailbox
-                    print(f"Moving email to {cfg.get('COMPLETED_PATH', '')}...")
-                    imap_server.copy(num, cfg.get("COMPLETED_PATH", ""))
-                    imap_server.store(num, "+FLAGS", "\\Deleted")
-                    print("Email moved to the completed mailbox.")
+                        # Move the email to the completed mailbox
+                        logger.info(
+                            f"Moving email to {cfg.get('COMPLETED_PATH', '')}..."
+                        )
+                        imap_server.copy(num, cfg.get("COMPLETED_PATH", ""))
+                        imap_server.store(num, "+FLAGS", "\\Deleted")
+                        logger.info("Email moved to the completed mailbox.")
+                    except Exception:
+                        logger.exception("Error processing email")
+                        # Move error email to the completed mailbox
+                        logger.info(
+                            f"Moving error email to {cfg.get('ERROR_PATH', '')}..."
+                        )
+                        imap_server.copy(num, cfg.get("ERROR_PATH", ""))
+                        imap_server.store(num, "+FLAGS", "\\Deleted")
+                        logger.info("Email moved to the error mailbox.")
 
     # Permanently remove deleted emails and logout from IMAP server
-    print("Cleaning up...")
+    logger.info("Cleaning up...")
     imap_server.expunge()
-    print("Cleanup completed.")
+    logger.info("Cleanup completed.")
     imap_server.logout()
 
-    print("Done.")
+    logger.info("Done.")
